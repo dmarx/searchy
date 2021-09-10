@@ -8,9 +8,9 @@
 # searchy get 'text prompt'
 # searchy get 'text prompt' -n 10
 
-import CLIP
-import faiss
-import sqlite
+#import CLIP
+#import faiss
+import sqlite3
 import torch # dataloader
 
 # fire cli?
