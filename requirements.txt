@@ -1,6 +1,5 @@
 #CLIP  # timm?  # https://github.com/openai/CLIP
 #faiss          # https://github.com/facebookresearch/faiss/wiki/Getting-started
-# fire    # https://github.com/google/python-fire
 #nlpaug         # https://github.com/makcedward/nlpaug
 # flit
 # black coverage flake8 mccabe mypy pylint pytest tox # build resources
@@ -8,3 +7,8 @@
 #yaspin         # https://github.com/pavdmyt/yaspin - alternative spinner majigs
 #rich           # https://github.com/willmcgugan/rich
 #loguru
+
+fire
+torch
+torchvision
+transformers

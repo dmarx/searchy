@@ -13,6 +13,17 @@
 import sqlite3
 import torch # dataloader
 
+#https://huggingface.co/transformers/model_doc/clip.html
+from PIL import Image
+from transformers import CLIPProcessor, CLIPModel
+
+class CLIP(torch.nn):
+    def __init__(self, model_string="openai/clip-vit-base-patch32"):
+        self._model_string = model_string
+        self.model = CLIPModel.from_pretrained(model_string)
+        self.processor = CLIPProcessor.from_pretrained(model_string)
+    
+
 # fire cli?
 # https://github.com/google/python-fire
 class SearchyClient:
@@ -21,6 +32,7 @@ class SearchyClient:
             self.from_config()
         self._get_vector_store() #create_FAISS()
         self._get_filepath_db() #create_sqlite() # might not be necessary
+        self.clip = CLIP()
         
     def _get_vector_store(self):
         pass
@@ -33,11 +45,16 @@ class SearchyClient:
         # maybe write database metadata to a file
         # e.g. configs for transforms, file paths, etc.
         # specify where to load model from, where to download to, how to load (e.g. from torch hub)
+    
+    def load_image(self, path):
+        return Image.open(path)
 
     def process(self, path='.'):
-        for batch in get_batches():
-            augment_images()
-        pass
+        im = self.load_image(path)
+        return self.clip.processor(images=im)
+        #for batch in get_batches():
+        #    augment_images()
+        #pass
     
     def get(self, query, path='.', n=3, return_scores=True):
         queries = augment(query)
