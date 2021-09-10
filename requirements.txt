@@ -1,0 +1,4 @@
+#CLIP  # timm?  # https://github.com/openai/CLIP
+#faiss          # https://github.com/facebookresearch/faiss/wiki/Getting-started
+#python-fire    # https://github.com/google/python-fire
+#nlpaug         # https://github.com/makcedward/nlpaug
