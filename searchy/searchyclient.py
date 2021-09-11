@@ -10,12 +10,16 @@
 
 #import CLIP
 #import faiss
+from pathlib import Path
+import imghdr # builtin
 import sqlite3
-import torch # dataloader
 
 #https://huggingface.co/transformers/model_doc/clip.html
 from PIL import Image
+import torch # dataloader
+from torch.utils.data import DataLoader, Dataset
 from transformers import CLIPProcessor, CLIPModel
+
 
 class CLIP(torch.nn.Module):
     def __init__(self, model_string="openai/clip-vit-base-patch32"):
@@ -23,7 +27,39 @@ class CLIP(torch.nn.Module):
         self._model_string = model_string
         self.model = CLIPModel.from_pretrained(model_string)
         self.processor = CLIPProcessor.from_pretrained(model_string)
+    def project_images(self, images, normalize=True):
+        imgs = self.processor(images=images, return_tensors="pt", padding=True)
+        feats = self.model.get_image_features(**imgs)
+        if normalize:
+            feats = self.normalize(feats)
+        return feats
+    def project_texts(self, texts, normalize=True):
+        txts = self.processor(text=texts, return_tensors="pt", padding=True)
+        feats = self.model.get_text_features(**txts)
+        if normalize:
+            feats = self.normalize(feats)
+        return feats
+    def normalize(self, x):
+        return x / x.norm(dim=-1, keepdim=True)
     
+
+
+# https://pytorch.org/tutorials/beginner/basics/data_tutorial.html#creating-a-custom-dataset-for-your-files
+# NB: might be able to use lightning datamodule to parallelize data processing
+class RecusiveImagesPath(Dataset):
+    def __init__(self, root='sample_data/images'):
+        self.root = root
+        self.get_image_paths()
+    def get_image_paths(self):
+        self.img_paths = []
+        for path_obj in Path(self.root).glob('*'):
+            if imghdr.what(path_obj) is not None:
+                self.img_paths.append(path_obj)
+    def __len__(self):
+        return len(self.img_paths)
+    def __getitem__(self, idx):
+        path = self.img_paths[idx]
+        return Image.open(path), path
 
 # fire cli?
 # https://github.com/google/python-fire

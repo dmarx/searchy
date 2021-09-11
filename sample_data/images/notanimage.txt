@@ -1,0 +1,4 @@
+foobar
+I am a text document
+
+this is not an image.
