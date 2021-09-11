@@ -9,6 +9,7 @@
 #loguru
 
 fire
+ftfy
 torch
 torchvision
 transformers

@@ -17,8 +17,9 @@ import torch # dataloader
 from PIL import Image
 from transformers import CLIPProcessor, CLIPModel
 
-class CLIP(torch.nn):
+class CLIP(torch.nn.Module):
     def __init__(self, model_string="openai/clip-vit-base-patch32"):
+        super().__init__()
         self._model_string = model_string
         self.model = CLIPModel.from_pretrained(model_string)
         self.processor = CLIPProcessor.from_pretrained(model_string)
@@ -28,7 +29,7 @@ class CLIP(torch.nn):
 # https://github.com/google/python-fire
 class SearchyClient:
     def __init__(self, cfg=None):
-        if config:
+        if cfg:
             self.from_config()
         self._get_vector_store() #create_FAISS()
         self._get_filepath_db() #create_sqlite() # might not be necessary
