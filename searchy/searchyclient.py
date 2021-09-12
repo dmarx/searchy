@@ -8,17 +8,20 @@
 # searchy get 'text prompt'
 # searchy get 'text prompt' -n 10
 
-#import CLIP
-#import faiss
-from pathlib import Path
 import imghdr # builtin
+from pathlib import Path
 import sqlite3
 
-#https://huggingface.co/transformers/model_doc/clip.html
+import faiss
 from PIL import Image
-import torch # dataloader
+import torch
+import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
+#from torchvision.datasets import ImageFolder
+from torchvision.io import read_image
 from transformers import CLIPProcessor, CLIPModel
+from torchvision.transforms import ToTensor
+from torchvision import transforms
 
 
 class CLIP(torch.nn.Module):
@@ -27,6 +30,7 @@ class CLIP(torch.nn.Module):
         self._model_string = model_string
         self.model = CLIPModel.from_pretrained(model_string)
         self.processor = CLIPProcessor.from_pretrained(model_string)
+        self.model.eval()
     def project_images(self, images, normalize=True):
         imgs = self.processor(images=images, return_tensors="pt", padding=True)
         feats = self.model.get_image_features(**imgs)
@@ -42,14 +46,24 @@ class CLIP(torch.nn.Module):
     def normalize(self, x):
         return x / x.norm(dim=-1, keepdim=True)
     
-
+clip_transforms = transforms.Compose([
+    #transforms.ToPILImage(),
+    transforms.Resize(size=224),
+    transforms.CenterCrop(224),
+    #transforms.ToPILImage(),
+    transforms.ToTensor(),  # PIL -> ToTensor :: [0,255] -> [0.,1.]
+    transforms.Normalize([0.48145466, 0.4578275, 0.40821073], 
+                         [0.26862954, 0.26130258, 0.27577711]),
+    
+])
 
 # https://pytorch.org/tutorials/beginner/basics/data_tutorial.html#creating-a-custom-dataset-for-your-files
 # NB: might be able to use lightning datamodule to parallelize data processing
 class RecusiveImagesPath(Dataset):
-    def __init__(self, root='sample_data/images'):
+    def __init__(self, root='sample_data/images', transforms=clip_transforms):
         self.root = root
         self.get_image_paths()
+        self.transforms = transforms
     def get_image_paths(self):
         self.img_paths = []
         for path_obj in Path(self.root).glob('*'):
@@ -58,8 +72,19 @@ class RecusiveImagesPath(Dataset):
     def __len__(self):
         return len(self.img_paths)
     def __getitem__(self, idx):
-        path = self.img_paths[idx]
-        return Image.open(path), path
+        path = str(self.img_paths[idx])
+        im = Image.open(path)
+        #return Image.open(path), path
+        #try:
+        #    im = read_image(path)
+        #except RuntimeError:
+        #    #tensorize = ToTensor()
+        #    #im_pil = Image.open(path)
+        #    #im = tensorize(im_pil)
+        #    im = torch.zeros(3,10,10)
+        if self.transforms is not None:
+            im = self.transforms(im)
+        return im, path
 
 # fire cli?
 # https://github.com/google/python-fire
@@ -103,3 +128,9 @@ class SearchyClient:
 # ML Idea: approximate nearest neighbors via randomly initialized trees
 # - (with respect to choosing splitting features) 
 # - tree encoding dimensionality reduction
+
+if __name__ == '__main__':
+    dataset = RecusiveImagesPath()
+    img_loader = DataLoader(dataset, batch_size=16, shuffle=False)
+    for i, (batch, paths) in enumerate(img_loader):
+        continue
