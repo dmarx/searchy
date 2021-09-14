@@ -25,14 +25,18 @@ from torchvision import transforms
 
 
 class CLIP(torch.nn.Module):
+    n_feats = 5125
     def __init__(self, model_string="openai/clip-vit-base-patch32"):
         super().__init__()
         self._model_string = model_string
         self.model = CLIPModel.from_pretrained(model_string)
         self.processor = CLIPProcessor.from_pretrained(model_string)
         self.model.eval()
-    def project_images(self, images, normalize=True):
-        imgs = self.processor(images=images, return_tensors="pt", padding=True)
+    def project_images(self, images, normalize=True, preprocessed=False):
+        if not preprocessed:
+            imgs = self.processor(images=images, return_tensors="pt", padding=True)
+        else:
+            imgs = {'pixel_values':images}
         feats = self.model.get_image_features(**imgs)
         if normalize:
             feats = self.normalize(feats)
@@ -60,49 +64,75 @@ clip_transforms = transforms.Compose([
 # https://pytorch.org/tutorials/beginner/basics/data_tutorial.html#creating-a-custom-dataset-for-your-files
 # NB: might be able to use lightning datamodule to parallelize data processing
 class RecusiveImagesPath(Dataset):
-    def __init__(self, root='sample_data/images', transforms=clip_transforms):
+    def __init__(self, 
+                 root='sample_data/images', 
+                 transforms=clip_transforms,
+                 #assign_ids=True, # doesn't need to be optional...
+                 next_id=0
+                ):
+        if isinstance(root, str):
+            root = Path(root)
+        assert root.is_dir()
         self.root = root
-        self.get_image_paths()
         self.transforms = transforms
+        #self.assign_ids = assign_ids
+        self.next_id = next_id
+        self.get_image_paths()
     def get_image_paths(self):
         self.img_paths = []
-        for path_obj in Path(self.root).glob('*'):
+        for path_obj in self.root.glob('*'):
+            if self._already_indexed(path_obj):
+                continue
             if imghdr.what(path_obj) is not None:
-                self.img_paths.append(path_obj)
+                self.img_paths.append((path_obj, self.next_id))
+                self.next_id += 1
+    def _already_indexed(self, path_obj):
+        # implement this later, assume all images are new for now
+        return False
     def __len__(self):
         return len(self.img_paths)
     def __getitem__(self, idx):
-        path = str(self.img_paths[idx])
+        path_obj, im_id = self.img_paths[idx]
+        path = str(path_obj)
         im = Image.open(path)
-        #return Image.open(path), path
-        #try:
-        #    im = read_image(path)
-        #except RuntimeError:
-        #    #tensorize = ToTensor()
-        #    #im_pil = Image.open(path)
-        #    #im = tensorize(im_pil)
-        #    im = torch.zeros(3,10,10)
         if self.transforms is not None:
             im = self.transforms(im)
-        return im, path
+        return im, path, im_id
+
+
 
 # fire cli?
 # https://github.com/google/python-fire
 class SearchyClient:
-    def __init__(self, cfg=None):
+    def __init__(self,
+                 images_root,
+                 index_path='index.faissindex',
+                 cfg=None):
+        """
+        images_root: root directory hosting images, will be recursively walked for indexing.
+        index_path: path to faiss index
+        """
+        self.images_root = Path(images_root)
+        self.index_path = Path(index_path)
         if cfg:
-            self.from_config()
+            self.from_config(cfg)
+        self.clip = CLIP()
         self._get_vector_store() #create_FAISS()
         self._get_filepath_db() #create_sqlite() # might not be necessary
-        self.clip = CLIP()
+        
         
     def _get_vector_store(self):
-        pass
+        #pass
+        if my_file.exists():
+            self._vector_store = faiss.read_index(str(self.index_path))
+        else:
+            index = faiss.IndexFlatIP(self.clip.n_feats)
+            self._vector_store = faiss.IndexIDMap(index)
     
     def _get_filepath_db(self):
         pass
 
-    def from_config(self):
+    def from_config(self, cfg):
         pass
         # maybe write database metadata to a file
         # e.g. configs for transforms, file paths, etc.
